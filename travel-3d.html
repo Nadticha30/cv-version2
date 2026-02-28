@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fabulous Journey: Phitsanulok v12.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background: #87ceeb;
+            color: #333;
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .ui-panel {
+            position: absolute;
+            top: 25px;
+            left: 25px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            padding: 24px;
+            border-radius: 20px;
+            border: 1px solid rgba(46, 139, 87, 0.3);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            max-width: 260px;
+            pointer-events: auto;
+        }
+
+        h1 {
+            margin: 0 0 8px 0;
+            font-size: 1.1rem;
+            color: #2e8b57;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-row {
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+        }
+
+        .label {
+            font-size: 0.65rem;
+            color: #777;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .value {
+            color: #333;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .control-group {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #2e8b57;
+            margin-top: 5px;
+        }
+
+        .cam-btns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        button {
+            background: #fff;
+            border: 1.5px solid #2e8b57;
+            color: #2e8b57;
+            padding: 8px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+
+        button.active {
+            background: #2e8b57;
+            color: #fff;
+        }
+
+        button:hover {
+            background: #f0fff4;
+        }
+
+        .location-bubble {
+            position: absolute;
+            bottom: 35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(46, 139, 87, 0.95);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+            z-index: 100;
+            pointer-events: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 15px;
+            right: 25px;
+            text-align: right;
+            font-size: 0.7rem;
+            color: #555;
+            font-weight: 600;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="ui-panel">
+        <h1>🌸 Fabulous Journey</h1>
+        <div class="data-row">
+            <div class="label">🕙 Journey Clock</div>
+            <div class="value" id="timeLog">--:--:--</div>
+        </div>
+
+        <div class="control-group">
+            <div class="label">⚙️ Scenic Speed</div>
+            <input type="range" id="speedSlider" min="1" max="50" value="5">
+        </div>
+
+        <div class="control-group">
+            <div class="label">🎥 View Mode</div>
+            <div class="cam-btns">
+                <button id="viewOrbit" class="active">🔄 Free Look</button>
+                <button id="viewTop">☁️ Map Mode</button>
+                <button id="viewFront">🛤️ Driver</button>
+                <button id="viewSide">🚂 Scenic</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="location-bubble" id="currentInfo">Loading Fabulous Journey...</div>
+    <div class="footer">Nadticha's Masterpiece v12.0 • Fabulous & Butter-Smooth</div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script src="data.js"></script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // --- Core Context ---
+        const scale = 1800;
+        const startLat = journeyData[0].lat;
+        const startLon = journeyData[0].lon;
+        const pts = journeyData.map(p => new THREE.Vector3((p.lon - startLon) * scale, 0, -(p.lat - startLat) * scale));
+        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.5);
+        const pathResolution = 4000;
+        const sampledPoints = curve.getSpacedPoints(pathResolution);
+
+        // Province Data
+        const provinceMarkers = [
+            { name: "Chiang Mai", lat: 18.7883, lon: 98.9853, color: 0xff4d4d },
+            { name: "Lamphun", lat: 18.5772, lon: 99.0084, color: 0xffcc00 },
+            { name: "Lampang", lat: 18.2917, lon: 99.4923, color: 0x00cc44 },
+            { name: "Uttaradit", lat: 17.6334, lon: 100.0988, color: 0x00aaff },
+            { name: "Phitsanulok", lat: 16.8211, lon: 100.2659, color: 0xff00ff }
+        ];
+
+        // --- Scene Logic ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.Fog(0x87ceeb, 100, 1500);
+
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 4000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // --- Lights (Enhanced for Beauty) ---
+        const ambient = new THREE.AmbientLight(0xffffff, 1.0); scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xffffff, 2.0);
+        sun.position.set(200, 400, 100); sun.castShadow = true;
+        scene.add(sun);
+
+        // --- Fabulous Nature (v12.0 Re-Beauty) ---
+        const floorGeo = new THREE.CircleGeometry(3000, 32);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0xb7e19d, roughness: 0.8 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2; floor.position.y = -0.6; floor.receiveShadow = true; scene.add(floor);
+
+        function createFabulousNature() {
+            // Mountains
+            for (let i = 0; i < 30; i++) {
+                const mt = new THREE.Mesh(new THREE.ConeGeometry(50 + Math.random() * 50, 70 + Math.random() * 80, 4), new THREE.MeshStandardMaterial({ color: 0x2e8b57 }));
+                const r = 1100 + Math.random() * 600;
+                const a = Math.random() * Math.PI * 2;
+                mt.position.set(Math.cos(a) * r, 20, Math.sin(a) * r);
+                scene.add(mt);
+            }
+
+            // INSTANCED BEAUTY
+            const itemSpacing = 6;
+            const count = Math.floor(sampledPoints.length / itemSpacing);
+
+            // Flower clusters (merged geometry)
+            const flGeo1 = new THREE.SphereGeometry(0.5, 6, 6).translate(0, 0, 0);
+            const flGeo2 = new THREE.SphereGeometry(0.4, 6, 6).translate(0.6, 0.2, 0.4);
+            const flGeo3 = new THREE.SphereGeometry(0.4, 6, 6).translate(-0.6, 0.1, -0.4);
+            const clusterGeo = BufferGeometryUtils.mergeBufferGeometries([flGeo1, flGeo2, flGeo3]);
+
+            const flowerColors = [0xff1493, 0xffd700, 0x00ffff, 0xff4500, 0xffffff];
+            const flowerInsts = flowerColors.map(c => new THREE.InstancedMesh(clusterGeo, new THREE.MeshStandardMaterial({ color: c }), Math.ceil(count / 5)));
+
+            // Designer Trees (merged geometry)
+            const trunkGeo = new THREE.CylinderGeometry(0.3, 0.4, 6).translate(0, 3, 0);
+            const lv1 = new THREE.ConeGeometry(3, 4, 8).translate(0, 6, 0);
+            const lv2 = new THREE.ConeGeometry(2.2, 3.5, 8).translate(0, 8, 0);
+            const designerTreeGeo = BufferGeometryUtils.mergeBufferGeometries([trunkGeo, lv1, lv2]);
+            const designerTreeInst = new THREE.InstancedMesh(designerTreeGeo, new THREE.MeshStandardMaterial({ color: 0x1e5631 }), Math.ceil(count / 4));
+
+            const sleeperGeo = new THREE.BoxGeometry(3, 0.2, 0.8);
+            const sleeperInst = new THREE.InstancedMesh(sleeperGeo, new THREE.MeshStandardMaterial({ color: 0x3d2b1f }), Math.ceil(sampledPoints.length / 10));
+
+            const dummy = new THREE.Object3D();
+
+            for (let i = 0; i < count; i++) {
+                const p = sampledPoints[i * itemSpacing];
+                const side = (i % 2 === 0) ? 1 : -1;
+                const offset = 4 + Math.random() * 6;
+
+                // Flowers
+                dummy.position.set(p.x + offset * side, 0.5, p.z + offset * side);
+                dummy.scale.setScalar(0.8 + Math.random() * 0.5);
+                dummy.updateMatrix();
+                flowerInsts[i % 5].setMatrixAt(Math.floor(i / 5), dummy.matrix);
+
+                // Trees every 4 items
+                if (i % 4 === 0) {
+                    dummy.position.set(p.x - offset * side * 2.5, 0, p.z - offset * side * 2.5);
+                    dummy.scale.setScalar(0.8 + Math.random() * 0.6);
+                    dummy.updateMatrix();
+                    designerTreeInst.setMatrixAt(Math.floor(i / 4), dummy.matrix);
+                }
+            }
+
+            for (let i = 0; i < Math.floor(sampledPoints.length / 10); i++) {
+                const p = sampledPoints[i * 10];
+                dummy.position.copy(p);
+                dummy.scale.set(1, 1, 1);
+                if (i * 10 < sampledPoints.length - 1) {
+                    dummy.lookAt(sampledPoints[i * 10 + 1]);
+                    dummy.rotateY(Math.PI / 2);
+                }
+                dummy.updateMatrix();
+                sleeperInst.setMatrixAt(i, dummy.matrix);
+            }
+
+            scene.add(designerTreeInst, sleeperInst);
+            flowerInsts.forEach(m => scene.add(m));
+        }
+        createFabulousNature();
+
+        // Province Labels
+        const loader = new FontLoader();
+        loader.load('https://unpkg.com/three@0.160.0/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+            provinceMarkers.forEach(m => {
+                const g = new TextGeometry(m.name, { font, size: 10, height: 2 });
+                const msh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: m.color, emissive: m.color, emissiveIntensity: 0.2 }));
+                msh.position.set((m.lon - startLon) * scale, 30, -(m.lat - startLat) * scale);
+                msh.rotation.x = -Math.PI / 4;
+                scene.add(msh);
+            });
+        });
+
+        // Rails
+        scene.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 1000, 0.15, 8, false), new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 })));
+
+        // --- SOLO PERFECT LOCOMOTIVE ---
+        function createLoco() {
+            const masterGroup = new THREE.Group();
+            const locoModel = new THREE.Group();
+
+            const body = new THREE.Mesh(new THREE.BoxGeometry(4, 1.4, 1.8), new THREE.MeshStandardMaterial({ color: 0xcc0000, metalness: 0.3, roughness: 0.2 }));
+            body.position.y = 1; locoModel.add(body);
+
+            const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 3), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9 }));
+            boiler.rotation.z = Math.PI / 2; boiler.position.set(0.6, 1.8, 0); locoModel.add(boiler);
+
+            const funnel = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 1.8), new THREE.MeshStandardMaterial({ color: 0x000000 }));
+            funnel.position.set(1.6, 2.8, 0); locoModel.add(funnel);
+
+            const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2, 1.8), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            cabin.position.set(-1.2, 2, 0); locoModel.add(cabin);
+
+            locoModel.rotation.y = -Math.PI / 2; // Axis fix
+            masterGroup.add(locoModel);
+            scene.add(masterGroup); return masterGroup;
+        }
+        const locomotive = createLoco();
+
+        // --- Animation Logic ---
+        let currentIdx = 0;
+        const speedSlider = document.getElementById('speedSlider');
+        let moveSpeed = 0.2;
+        speedSlider.oninput = () => { moveSpeed = parseInt(speedSlider.value) / 20; };
+
+        let camMode = 'orbit';
+        const setCam = (m) => {
+            camMode = m;
+            document.querySelectorAll('.cam-btns button').forEach(b => b.classList.remove('active'));
+            document.getElementById('view' + m.charAt(0).toUpperCase() + m.slice(1)).classList.add('active');
+            controls.enabled = (m === 'orbit');
+        };
+        document.getElementById('viewOrbit').onclick = () => setCam('orbit');
+        document.getElementById('viewTop').onclick = () => setCam('top');
+        document.getElementById('viewFront').onclick = () => setCam('front');
+        document.getElementById('viewSide').onclick = () => setCam('side');
+
+        function animate() {
+            requestAnimationFrame(animate);
+            currentIdx += moveSpeed;
+            if (currentIdx >= pathResolution) currentIdx = 0;
+
+            const pos = sampledPoints[Math.floor(currentIdx)];
+            const lookPos = sampledPoints[(Math.floor(currentIdx) + 4) % pathResolution];
+
+            locomotive.position.copy(pos);
+            locomotive.lookAt(lookPos);
+
+            // Camera View
+            if (camMode === 'orbit') {
+                controls.target.lerp(locomotive.position, 0.1);
+            } else if (camMode === 'top') {
+                camera.position.lerp(new THREE.Vector3(locomotive.position.x, 220, locomotive.position.z), 0.1);
+                camera.lookAt(locomotive.position);
+            } else if (camMode === 'front') {
+                const dir = lookPos.clone().sub(pos).normalize();
+                camera.position.lerp(locomotive.position.clone().add(new THREE.Vector3(0, 5, 0)).add(dir.multiplyScalar(1)), 0.2);
+                camera.lookAt(locomotive.position.clone().add(dir.multiplyScalar(50)));
+            } else if (camMode === 'side') {
+                camera.position.lerp(locomotive.position.clone().add(new THREE.Vector3(60, 30, 60)), 0.05);
+                controls.target.lerp(locomotive.position, 0.1);
+            }
+
+            // Sync UI
+            const gIdx = Math.floor((currentIdx / pathResolution) * (journeyData.length - 1));
+            document.getElementById('currentInfo').innerText = "🚂 Fabulous Path: " + journeyData[gIdx].place;
+            document.getElementById('timeLog').innerText = journeyData[gIdx].time.split(' ')[1];
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        };
+        animate();
+    </script>
+</body>
+
+</html>

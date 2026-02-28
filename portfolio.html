@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fabulous 3D Journey | Phitsanulok Masterpiece</title>
+    <!-- Premium Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Icons & Animation Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --accent: #f43f5e;
+            --bg: #030712;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+
+        /* Animated Mesh Background */
+        .mesh-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 10% 10%, rgba(99, 102, 241, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 90% 90%, rgba(244, 63, 94, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.05) 0%, transparent 50%);
+            filter: blur(80px);
+            animation: meshMove 20s infinite alternate;
+        }
+
+        @keyframes meshMove {
+            from {
+                transform: scale(1);
+            }
+
+            to {
+                transform: scale(1.15);
+            }
+        }
+
+        /* Navbar */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            padding: 1.5rem 8%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(3, 7, 18, 0.7);
+            backdrop-filter: blur(20px);
+            z-index: 1000;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .logo {
+            font-size: 1.4rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .btn-launch {
+            background: #fff;
+            color: #000;
+            padding: 0.8rem 2rem;
+            border-radius: 100px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 0.9rem;
+        }
+
+        .btn-launch:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Hero Section */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 8%;
+        }
+
+        .hero h2 {
+            font-size: 1.1rem;
+            color: var(--primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(3.5rem, 10vw, 7.5rem);
+            line-height: 1;
+            font-weight: 700;
+            margin-bottom: 2.5rem;
+            background: linear-gradient(to bottom, #fff, #64748b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -2px;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.3rem;
+            max-width: 700px;
+            line-height: 1.6;
+            margin-bottom: 4rem;
+        }
+
+        /* Feature Sections */
+        .feature-grid {
+            padding: 10rem 8%;
+            display: grid;
+            gap: 12rem;
+        }
+
+        .feature-item {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6rem;
+            align-items: center;
+        }
+
+        .feature-item:nth-child(even) {
+            direction: rtl;
+        }
+
+        .feature-item:nth-child(even) .feature-text {
+            direction: ltr;
+        }
+
+        .feature-text h3 {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        .feature-text p {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+        }
+
+        .feature-visual {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 40px;
+            aspect-ratio: 4/3;
+            backdrop-filter: blur(40px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .feature-visual img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.7;
+        }
+
+        .visual-label {
+            position: absolute;
+            bottom: 2rem;
+            left: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1.5rem;
+            border-radius: 20px;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Tech Highlights Overlay */
+        .tech-highlights {
+            padding: 8rem 8%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 3rem;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .tech-card {
+            padding: 3rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 40px;
+            text-align: center;
+        }
+
+        .tech-card i {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 2rem;
+        }
+
+        .tech-card h4 {
+            font-size: 1.6rem;
+            margin-bottom: 1rem;
+        }
+
+        .tech-card p {
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Path Tracker */
+        .journey-path {
+            padding: 10rem 8%;
+            text-align: center;
+        }
+
+        .path-line {
+            max-width: 1000px;
+            margin: 4rem auto;
+            height: 2px;
+            background: var(--glass-border);
+            position: relative;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .path-node {
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--primary);
+            transform: translateY(-9px);
+            position: relative;
+        }
+
+        .node-label {
+            position: absolute;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        /* Final CTA */
+        .cta-section {
+            padding: 12rem 8%;
+            text-align: center;
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.1), transparent 70%);
+        }
+
+        .cta-section h2 {
+            font-size: 4rem;
+            margin-bottom: 3rem;
+            font-weight: 700;
+        }
+
+        .btn-large {
+            padding: 1.5rem 4rem;
+            font-size: 1.3rem;
+        }
+
+        /* Footer */
+        footer {
+            padding: 4rem 8%;
+            text-align: center;
+            border-top: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 1024px) {
+            .feature-item {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+                text-align: center;
+            }
+
+            .feature-item:nth-child(even) {
+                direction: ltr;
+            }
+
+            .tech-highlights {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 4rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="mesh-bg"></div>
+
+    <nav data-aos="fade-down">
+        <div class="logo">3D Journey.</div>
+        <a href="travel-3d.html" class="btn-launch">Launch v12.0</a>
+    </nav>
+
+    <section class="hero" id="home">
+        <h2 data-aos="fade-up">A Solo Project Masterpiece</h2>
+        <h1 data-aos="fade-up" data-aos-delay="100">THE PHITSANULOK<br>3D JOURNEY</h1>
+        <p data-aos="fade-up" data-aos-delay="200">ศิลปะการแสดงผลข้อมูลพิกัดการเดินทางที่ "เริ่ด" ที่สุด
+            จากเชียงใหม่สู่พิษณุโลก เนรมิตประสบการณ์ 3D ที่ลื่นสมูทระดับ 60 FPS ท่ามกลางทุ่งดอกไม้หลากสี</p>
+        <div data-aos="fade-up" data-aos-delay="300">
+            <a href="travel-3d.html" class="btn-launch btn-large">เริ่มการเดินทาง 3D <i class="fas fa-play"
+                    style="margin-left: 10px;"></i></a>
+        </div>
+    </section>
+
+    <section class="feature-grid">
+        <!-- Feature 1: Locomotive -->
+        <div class="feature-item" data-aos="fade-up">
+            <div class="feature-text">
+                <h3>The Perfect Locomotive</h3>
+                <p>หัวรถจักรไอน้ำสุดคลาสสิกที่ถูกปรับจูนโครงสร้างแกน (Axis Fix) ให้อยู่ในตำแหน่งที่แม่นยำ 100%
+                    วิ่งหันหน้าตรงเป๊ะไปตามรางอย่างสง่างาม ไม่มีการไถลข้าง</p>
+                <ul style="list-style: none; color: var(--primary); font-weight: 700;">
+                    <li><i class="fas fa-check-circle"></i> Boiler-Forward Alignment</li>
+                    <li><i class="fas fa-check-circle"></i> Realistic Model Scaling</li>
+                </ul>
+            </div>
+            <div class="feature-visual">
+                <img src="https://images.unsplash.com/photo-1474487585617-30d4b395112e?auto=format&fit=crop&w=800&q=80"
+                    alt="Locomotive">
+                <div class="visual-label">PRECISION MODEL</div>
+            </div>
+        </div>
+
+        <!-- Feature 2: Performance -->
+        <div class="feature-item" data-aos="fade-up">
+            <div class="feature-text">
+                <h3>60 FPS Butter-Smooth</h3>
+                <p>สัมผัสทัศนียภาพที่ไหลลื่นอย่างไร้ที่ติด้วยเทคโนโลยี InstancedMesh ที่ช่วยรีดประสิทธิภาพ GPU ขั้นสุด
+                    ลด draw calls จากพันเหลือเพียงหลักหน่วย</p>
+                <div style="background: var(--glass); padding: 1.5rem; border-radius: 20px;">
+                    <span style="font-size: 2rem; font-weight: 700;">60.0</span>
+                    <span style="color: var(--primary);">FPS STABLE</span>
+                </div>
+            </div>
+            <div class="feature-visual">
+                <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80"
+                    alt="Performance">
+                <div class="visual-label">HYPER OPTIMIZED</div>
+            </div>
+        </div>
+
+        <!-- Feature 3: Flora -->
+        <div class="feature-item" data-aos="fade-up">
+            <div class="feature-text">
+                <h3>Botanical Beauty</h3>
+                <p>ทุ่งดอกไม้หลากสีและหมู่บ้านต้นไม้แสนสวยที่ถูกปักไว้ตลอดสองข้างทางรถไฟ เพื่อมอบบรรยากาศการเดินทางที่
+                    "เริ่ด" และสดใสที่สุดในทุกเฟรม</p>
+                <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                    <div style="width: 30px; height: 30px; background: #ff1493; border-radius: 50%;"></div>
+                    <div style="width: 30px; height: 30px; background: #ffd700; border-radius: 50%;"></div>
+                    <div style="width: 30px; height: 30px; background: #00ffff; border-radius: 50%;"></div>
+                </div>
+            </div>
+            <div class="feature-visual">
+                <img src="https://images.unsplash.com/photo-1490750967868-886a502646a7?auto=format&fit=crop&w=800&q=80"
+                    alt="Flora">
+                <div class="visual-label">FABULOUS LUSH NATURE</div>
+            </div>
+        </div>
+    </section>
+
+    <div class="tech-highlights">
+        <div class="tech-card" data-aos="zoom-in" data-aos-delay="100">
+            <i class="fas fa-cube"></i>
+            <h4>Three.js Engine</h4>
+            <p>การเขียน WebGL ขั้นสูงเพื่อสร้างโลก 3D ที่ตอบสนองได้แบบ Real-time</p>
+        </div>
+        <div class="tech-card" data-aos="zoom-in" data-aos-delay="200">
+            <i class="fas fa-code"></i>
+            <h4>Axis Fix Logic</h4>
+            <p>ระบบการคำนวณทิศทางการหันหน้า (lookAt) ที่ผ่านการปรับจูนแกนโมเดลพิเศษ</p>
+        </div>
+        <div class="tech-card" data-aos="zoom-in" data-aos-delay="300">
+            <i class="fas fa-tachometer-alt"></i>
+            <h4>InstancedMesh</h4>
+            <p>การวาดวัตถุจำนวนมหาศาลพร้อมกันเพื่อความเสถียรและความลื่นไหลขั้นสุด</p>
+        </div>
+    </div>
+
+    <section class="journey-path" data-aos="fade-up">
+        <h3>The Route We Traveled</h3>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">จากเมืองเหนือสู่ศุนย์กลางการเชื่อมต่อ</p>
+        <div class="path-line">
+            <div class="path-node"><span class="node-label">Chiang Mai</span></div>
+            <div class="path-node"><span class="node-label">Lamphun</span></div>
+            <div class="path-node"><span class="node-label">Lampang</span></div>
+            <div class="path-node"><span class="node-label">Uttaradit</span></div>
+            <div class="path-node"><span class="node-label">Phitsanulok</span></div>
+        </div>
+    </section>
+
+    <section class="cta-section" data-aos="fade-up">
+        <h2>Experience the Journey yourself.</h2>
+        <a href="travel-3d.html" class="btn-launch btn-large">Launch Phitsanulok 3D v12.0</a>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 The Phitsanulok 3D Project. Baitong Nadticha's Masterpiece Collection.</p>
+        <p style="margin-top: 1rem; opacity: 0.5;">Built for Perferction • 100% Fabulous Design</p>
+    </footer>
+
+    <!-- AOS Library -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        AOS.init({
+            duration: 1200,
+            once: true,
+            easing: 'ease-out-cubic'
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Majestic Aurora | DustBoy 3.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        :root {
+            --aurora-1: #00f2ff;
+            --aurora-2: #7000ff;
+            --aurora-3: #ffd700;
+            --bg: #02040a;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Aurora Background */
+        .aurora-bg {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: linear-gradient(135deg, #02040a 0%, #0a0c1a 100%);
+            overflow: hidden;
+        }
+
+        .aurora-wave {
+            position: absolute;
+            width: 150%;
+            height: 150%;
+            top: -25%;
+            left: -25%;
+            filter: blur(80px);
+            opacity: 0.3;
+            background: radial-gradient(circle at 30% 30%, var(--aurora-1) 0%, transparent 40%),
+                radial-gradient(circle at 70% 70%, var(--aurora-2) 0%, transparent 40%),
+                radial-gradient(circle at 10% 80%, var(--aurora-3) 0%, transparent 30%);
+            animation: auroraMove 20s infinite alternate-reverse;
+        }
+
+        @keyframes auroraMove {
+            0% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate(50px, 50px) rotate(10deg);
+            }
+        }
+
+        /* HUD Layout */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 380px 1fr 380px;
+            height: 100vh;
+            padding: 30px;
+            gap: 30px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(30px);
+            border: 1px solid var(--border);
+            border-radius: 40px;
+            padding: 35px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Branding */
+        .brand {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .brand h1 {
+            font-size: 0.75rem;
+            color: var(--aurora-1);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .brand .title {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #fff, var(--aurora-1));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Gauges */
+        .gauge-section {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .gauge-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            padding: 25px;
+            text-align: center;
+            position: relative;
+            transition: all 0.4s;
+        }
+
+        .gauge-card:hover {
+            border-color: var(--aurora-1);
+            transform: translateY(-5px);
+            background: rgba(0, 242, 255, 0.05);
+        }
+
+        .gauge-label {
+            font-size: 0.9rem;
+            color: #64748b;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .gauge-value {
+            font-size: 4rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .gauge-unit {
+            font-size: 0.7rem;
+            color: var(--aurora-1);
+            font-weight: 600;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--aurora-1);
+            transition: width 1s ease;
+        }
+
+        /* Main Center Visual */
+        .center-visual {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            gap: 20px;
+        }
+
+        .location-box {
+            padding: 20px 50px;
+            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px dashed var(--aurora-1);
+            font-size: 1.8rem;
+            font-weight: 300;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Station Log */
+        .log-list {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .log-item {
+            padding: 15px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.02);
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .log-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--aurora-2);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+        }
+
+        .log-body {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .log-val {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--aurora-1);
+        }
+
+        /* Debug Sniffer */
+        .sniffer {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            height: 100px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 15px;
+            font-family: monospace;
+            font-size: 0.7rem;
+            color: #0f0;
+            padding: 10px;
+            overflow-y: auto;
+            opacity: 0.5;
+            z-index: 100;
+            display: none;
+            /* Toggleable */
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Scanning Anm */
+        .scanning {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .scanning::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+            animation: scanLine 2s infinite;
+        }
+
+        @keyframes scanLine {
+            100% {
+                left: 200%;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="aurora-bg">
+        <div class="aurora-wave"></div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Left Panel: Critical Stats -->
+        <div class="panel">
+            <div class="brand">
+                <h1>Two Rivers Oracle</h1>
+                <div class="title">MAJESTIC AURORA</div>
+            </div>
+
+            <div class="gauge-section">
+                <!-- PM 2.5 -->
+                <div class="gauge-card">
+                    <div class="gauge-label">AIR QUALITY CONTROL</div>
+                    <div class="gauge-value" id="val-pm25">--</div>
+                    <div class="gauge-unit">PM2.5 DENSITY</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="fill-pm25"></div>
+                    </div>
+                </div>
+
+                <!-- PM 10 -->
+                <div class="gauge-card">
+                    <div class="gauge-label">PARTICULATE MATTER</div>
+                    <div class="gauge-value" id="val-pm10" style="color: var(--aurora-2);">--</div>
+                    <div class="gauge-unit">PM10 CONCENTRATION</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="fill-pm10" style="background: var(--aurora-2);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: auto; padding-top: 20px; font-size: 0.7rem; border-top: 1px solid var(--border); color: #444;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>MQTT BRIDGE CONNECTION</span>
+                    <span id="stat-conn" style="color: #f00;">DISCONNECTED</span>
+                </div>
+                <div style="margin-top: 5px;">TOPIC: DUSTBOY/+/+/+/status</div>
+                <div id="stat-time" style="margin-top: 5px;">SYNCING...</div>
+            </div>
+        </div>
+
+        <!-- Center: Visual Experience -->
+        <div class="center-visual">
+            <div
+                style="color: var(--aurora-1); letter-spacing: 12px; font-weight: 300; font-size: 0.9rem; margin-bottom: 10px;">
+                TELEMETRY FEED</div>
+            <div class="location-box scanning" id="val-loc">SCANNING RANGE...</div>
+            <div style="margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; opacity: 0.5;">TEMPERATURE</div>
+                    <div style="font-size: 2rem; font-weight: 700;" id="val-temp">--°C</div>
+                </div>
+                <div style="text-align: center;">
+                    <div style="font-size: 0.8rem; opacity: 0.5;">HUMIDITY</div>
+                    <div style="font-size: 2rem; font-weight: 700;" id="val-humid">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Remote Nodes -->
+        <div class="panel">
+            <div style="margin-bottom: 25px;">
+                <h3 style="font-size: 1.2rem; letter-spacing: 3px;">LIVE NODES</h3>
+                <div style="font-size: 0.6rem; color: #444;">REAL-TIME SIGNAL CAPTURE</div>
+            </div>
+
+            <div class="log-list" id="log-list">
+                <!-- Data items inject here -->
+                <div style="text-align: center; margin-top: 100px; color: #333; font-size: 0.8rem;">
+                    WAITING FOR FIRST PACKET...
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; textAlign: right;">
+                <button onclick="toggleSniffer()"
+                    style="background: transparent; border: 1px solid var(--border); color: #333; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-size: 0.6rem;">DEBUG
+                    SNIFFER</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Sniffer (Tool for Nadticha to see raw data) -->
+    <div class="sniffer" id="sniffer">
+        [ SYSTEM ] Establishing WebSocket connection...
+    </div>
+
+    <script>
+        const sniffer = document.getElementById('sniffer');
+        const logList = document.getElementById('log-list');
+
+        function toggleSniffer() {
+            sniffer.style.display = sniffer.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function addSniff(text) {
+            const div = document.createElement('div');
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+            sniffer.prepend(div);
+            if (sniffer.children.length > 50) sniffer.lastChild.remove();
+        }
+
+        // --- ULTRA FALLBACK DATA ENGINE ---
+        function extractValue(data, patterns) {
+            // Check literal keys first
+            for (const p of patterns) {
+                if (data[p] !== undefined) return parseFloat(data[p]);
+            }
+            // Smart scanning for keys containing patterns (fuzzy match)
+            for (const key in data) {
+                const kLower = key.toLowerCase();
+                for (const p of patterns) {
+                    if (kLower.includes(p)) return parseFloat(data[key]);
+                }
+            }
+            return 0;
+        }
+
+        function extractName(data, topic) {
+            if (data.nickname) return data.nickname;
+            if (data.db_name) return data.db_name;
+            if (data.station_name) return data.station_name;
+            // Topic fallback: DUSTBOY/ID/NAME/+/status
+            const parts = topic.split('/');
+            return parts[2] || parts[1] || "Unknown Node";
+        }
+
+        // --- MQTT LOGIC ---
+        const client = mqtt.connect('wss://dustboy-wss-bridge.laris.workers.dev/mqtt');
+
+        client.on('connect', () => {
+            document.getElementById('stat-conn').innerText = 'CONNECTED';
+            document.getElementById('stat-conn').style.color = '#00f2ff';
+            addSniff("Connected to bridge. Subscribing...");
+            client.subscribe('DUSTBOY/+/+/+/status');
+        });
+
+        client.on('message', (topic, message) => {
+            try {
+                const raw = message.toString();
+                addSniff(`RAW DATA: ${raw}`);
+                const data = JSON.parse(raw);
+                updateUI(data, topic);
+            } catch (e) {
+                addSniff(`PARSE ERROR: ${e.message}`);
+            }
+        });
+
+        function updateUI(data, topic) {
+            // Extract using Ultra-Fallback
+            const pm25 = extractValue(data, ['pm25', '25', 'v25', 'p2']);
+            const pm10 = extractValue(data, ['pm10', '10', 'v10', 'p1']);
+            const temp = extractValue(data, ['temp', 'tp', 't']);
+            const humid = extractValue(data, ['humid', 'hm', 'h']);
+            const loc = extractName(data, topic);
+
+            // Update Elements
+            document.getElementById('val-pm25').innerText = Math.round(pm25);
+            document.getElementById('val-pm10').innerText = Math.round(pm10);
+            document.getElementById('val-temp').innerText = `${Math.round(temp)}°C`;
+            document.getElementById('val-humid').innerText = `${Math.round(humid)}%`;
+
+            const locEl = document.getElementById('val-loc');
+            locEl.innerText = loc;
+            locEl.classList.remove('scanning');
+
+            document.getElementById('stat-time').innerText = `LATEST SYNC: ${new Date().toLocaleTimeString()}`;
+
+            // Progress fills
+            document.getElementById('fill-pm25').style.width = Math.min(pm25, 100) + '%';
+            document.getElementById('fill-pm10').style.width = Math.min(pm10, 100) + '%';
+
+            // Log Item
+            const item = document.createElement('div');
+            item.className = 'log-item';
+            item.innerHTML = `
+                <div class="log-header">
+                    <span style="color:#fff;">${loc}</span>
+                    <span style="opacity:0.4;">${new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="log-body">
+                    <div class="log-val">${Math.round(pm25)} <span style="font-size:0.5rem; opacity:0.5;">PM2.5</span></div>
+                    <div class="log-val" style="color:var(--aurora-2);">${Math.round(pm10)} <span style="font-size:0.5rem; opacity:0.5;">PM10</span></div>
+                </div>
+            `;
+            logList.insertBefore(item, logList.firstChild);
+            if (logList.children.length > 5) logList.lastChild.remove();
+        }
+    </script>
+</body>
+
+</html>
