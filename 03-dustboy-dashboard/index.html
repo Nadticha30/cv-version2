@@ -4,18 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Majestic Aurora | DustBoy 3.0</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>Quantum Oracle HUD | DustBoy 3.0</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Mono&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
-            --aurora-1: #00f2ff;
-            --aurora-2: #7000ff;
-            --aurora-3: #ffd700;
+            --cyan: #00f2ff;
+            --violet: #7000ff;
+            --gold: #ffd700;
             --bg: #02040a;
-            --glass: rgba(255, 255, 255, 0.05);
-            --border: rgba(255, 255, 255, 0.1);
-            --text: #f8fafc;
+            --glass: rgba(0, 242, 255, 0.03);
+            --border: rgba(0, 242, 255, 0.15);
+            --text: #ffffff;
         }
 
         * {
@@ -30,462 +33,499 @@
             color: var(--text);
             overflow: hidden;
             height: 100vh;
+            user-select: none;
         }
 
-        /* Aurora Background */
-        .aurora-bg {
+        #three-canvas {
             position: fixed;
-            inset: 0;
-            z-index: -1;
-            background: linear-gradient(135deg, #02040a 0%, #0a0c1a 100%);
-            overflow: hidden;
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
 
-        .aurora-wave {
-            position: absolute;
-            width: 150%;
-            height: 150%;
-            top: -25%;
-            left: -25%;
-            filter: blur(80px);
-            opacity: 0.3;
-            background: radial-gradient(circle at 30% 30%, var(--aurora-1) 0%, transparent 40%),
-                radial-gradient(circle at 70% 70%, var(--aurora-2) 0%, transparent 40%),
-                radial-gradient(circle at 10% 80%, var(--aurora-3) 0%, transparent 30%);
-            animation: auroraMove 20s infinite alternate-reverse;
-        }
-
-        @keyframes auroraMove {
-            0% {
-                transform: translate(0, 0) rotate(0deg);
-            }
-
-            100% {
-                transform: translate(50px, 50px) rotate(10deg);
-            }
-        }
-
-        /* HUD Layout */
-        .dashboard {
-            display: grid;
-            grid-template-columns: 380px 1fr 380px;
-            height: 100vh;
-            padding: 30px;
-            gap: 30px;
+        .hud-overlay {
             position: relative;
             z-index: 10;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 400px 1fr 400px;
+            padding: 40px;
+            gap: 30px;
+            pointer-events: none;
         }
 
         .panel {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(30px);
+            background: var(--glass);
+            backdrop-filter: blur(20px);
             border: 1px solid var(--border);
-            border-radius: 40px;
-            padding: 35px;
+            border-radius: 30px;
+            padding: 40px;
+            pointer-events: auto;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 15px 45px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+            animation: scanline 4s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        /* HUD Typing/Mono Font */
+        .mono {
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
         }
 
         /* Branding */
-        .brand {
-            text-align: center;
-            margin-bottom: 40px;
+        .branding h1 {
+            font-size: 0.7rem;
+            letter-spacing: 8px;
+            color: var(--cyan);
+            margin-bottom: 15px;
         }
 
-        .brand h1 {
-            font-size: 0.75rem;
-            color: var(--aurora-1);
-            letter-spacing: 6px;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-
-        .brand .title {
-            font-size: 2rem;
+        .branding .title {
+            font-size: 2.2rem;
             font-weight: 700;
-            background: linear-gradient(to right, #fff, var(--aurora-1));
+            line-height: 1;
+            margin-bottom: 30px;
+            background: linear-gradient(to bottom, #fff, var(--cyan));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         /* Gauges */
-        .gauge-section {
+        .telemetry-node {
+            margin-bottom: 40px;
+        }
+
+        .label-group {
             display: flex;
-            flex-direction: column;
-            gap: 30px;
-        }
-
-        .gauge-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border);
-            border-radius: 30px;
-            padding: 25px;
-            text-align: center;
-            position: relative;
-            transition: all 0.4s;
-        }
-
-        .gauge-card:hover {
-            border-color: var(--aurora-1);
-            transform: translateY(-5px);
-            background: rgba(0, 242, 255, 0.05);
-        }
-
-        .gauge-label {
-            font-size: 0.9rem;
-            color: #64748b;
-            letter-spacing: 2px;
+            justify-content: space-between;
+            align-items: flex-end;
             margin-bottom: 10px;
         }
 
-        .gauge-value {
-            font-size: 4rem;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 5px;
-            color: #fff;
+        .label {
+            font-size: 0.7rem;
+            opacity: 0.5;
+            letter-spacing: 2px;
         }
 
-        .gauge-unit {
-            font-size: 0.7rem;
-            color: var(--aurora-1);
+        .value {
+            font-size: 4.5rem;
+            font-weight: 700;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .unit {
+            font-size: 0.8rem;
+            color: var(--cyan);
             font-weight: 600;
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 6px;
+        .indicator-bar {
+            height: 4px;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-            margin-top: 20px;
-            overflow: hidden;
+            border-radius: 2px;
+            margin-top: 15px;
+            position: relative;
         }
 
-        .progress-fill {
+        .indicator-fill {
             height: 100%;
+            background: var(--cyan);
+            box-shadow: 0 0 15px var(--cyan);
             width: 0%;
-            background: var(--aurora-1);
-            transition: width 1s ease;
+            transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Main Center Visual */
-        .center-visual {
+        /* Center Visual */
+        .center-hub {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            gap: 20px;
         }
 
-        .location-box {
-            padding: 20px 50px;
-            border-radius: 100px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px dashed var(--aurora-1);
-            font-size: 1.8rem;
+        .crosshair {
+            width: 200px;
+            height: 200px;
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            position: relative;
+            margin-bottom: 50px;
+        }
+
+        .crosshair::before,
+        .crosshair::after {
+            content: '';
+            position: absolute;
+            background: var(--cyan);
+        }
+
+        .crosshair::before {
+            width: 100%;
+            height: 1px;
+            top: 50%;
+            left: 0;
+        }
+
+        .crosshair::after {
+            width: 1px;
+            height: 100%;
+            top: 0;
+            left: 50%;
+        }
+
+        .location-tag {
+            font-size: 2.5rem;
             font-weight: 300;
-            backdrop-filter: blur(10px);
+            letter-spacing: 5px;
+            border-bottom: 1px solid var(--cyan);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
         }
 
-        /* Station Log */
-        .log-list {
+        /* Right Panel: Nodes & Logs */
+        .node-list {
             flex: 1;
             overflow-y: auto;
-            padding-right: 5px;
+            margin-top: 20px;
+            padding-right: 10px;
         }
 
-        .log-item {
-            padding: 15px;
-            border-radius: 20px;
+        .node-item {
+            padding: 20px;
             background: rgba(255, 255, 255, 0.02);
-            margin-bottom: 10px;
-            border: 1px solid transparent;
-            transition: all 0.3s;
-            animation: slideIn 0.5s ease-out;
-        }
-
-        .log-item:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--aurora-2);
-        }
-
-        .log-header {
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            margin-bottom: 15px;
             display: flex;
             justify-content: space-between;
-            font-size: 0.75rem;
-            margin-bottom: 8px;
+            align-items: center;
+            animation: fadeInHUD 0.5s ease-out forwards;
         }
 
-        .log-body {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
-        .log-val {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--aurora-1);
-        }
-
-        /* Debug Sniffer */
-        .sniffer {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 500px;
-            height: 100px;
-            background: #000;
-            border: 1px solid #333;
-            border-radius: 15px;
-            font-family: monospace;
-            font-size: 0.7rem;
-            color: #0f0;
-            padding: 10px;
-            overflow-y: auto;
-            opacity: 0.5;
-            z-index: 100;
-            display: none;
-            /* Toggleable */
-        }
-
-        @keyframes slideIn {
+        @keyframes fadeInHUD {
             from {
-                transform: translateX(20px);
                 opacity: 0;
+                transform: translateX(20px);
             }
 
             to {
+                opacity: 1;
                 transform: translateX(0);
+            }
+        }
+
+        .node-info .name {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .node-info .time {
+            font-size: 0.6rem;
+            opacity: 0.4;
+        }
+
+        .node-stats {
+            text-align: right;
+        }
+
+        .node-stats .val {
+            font-size: 1.2rem;
+            color: var(--cyan);
+            font-weight: 700;
+        }
+
+        /* Scanning Artifacts */
+        .flicker {
+            animation: flick 0.1s infinite alternate;
+        }
+
+        @keyframes flick {
+            0% {
                 opacity: 1;
             }
-        }
 
-        /* Scanning Anm */
-        .scanning {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .scanning::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 50%;
-            height: 100%;
-            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
-            animation: scanLine 2s infinite;
-        }
-
-        @keyframes scanLine {
             100% {
-                left: 200%;
+                opacity: 0.8;
             }
         }
 
-        .hidden {
-            display: none;
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+
+        /* System Messages */
+        #stat-msg {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.6rem;
+            color: var(--cyan);
+            letter-spacing: 2px;
+            opacity: 0.6;
         }
     </style>
 </head>
 
 <body>
+    <canvas id="three-canvas"></canvas>
 
-    <div class="aurora-bg">
-        <div class="aurora-wave"></div>
-    </div>
-
-    <div class="dashboard">
-        <!-- Left Panel: Critical Stats -->
+    <div class="hud-overlay">
+        <!-- Dashboard Alpha -->
         <div class="panel">
-            <div class="brand">
-                <h1>Two Rivers Oracle</h1>
-                <div class="title">MAJESTIC AURORA</div>
+            <div class="branding">
+                <h1 class="mono flicker">Quantum Oracle v3.0</h1>
+                <div class="title">TWO RIVERS<br>TELEMETRY</div>
             </div>
 
-            <div class="gauge-section">
-                <!-- PM 2.5 -->
-                <div class="gauge-card">
-                    <div class="gauge-label">AIR QUALITY CONTROL</div>
-                    <div class="gauge-value" id="val-pm25">--</div>
-                    <div class="gauge-unit">PM2.5 DENSITY</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="fill-pm25"></div>
-                    </div>
+            <div class="telemetry-node">
+                <div class="label-group">
+                    <span class="label mono">Primary Pollutant</span>
+                    <span class="unit">PM2.5 μg/m³</span>
                 </div>
-
-                <!-- PM 10 -->
-                <div class="gauge-card">
-                    <div class="gauge-label">PARTICULATE MATTER</div>
-                    <div class="gauge-value" id="val-pm10" style="color: var(--aurora-2);">--</div>
-                    <div class="gauge-unit">PM10 CONCENTRATION</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="fill-pm10" style="background: var(--aurora-2);"></div>
-                    </div>
+                <div class="value" id="val-pm25">--</div>
+                <div class="indicator-bar">
+                    <div class="indicator-fill" id="fill-pm25"></div>
                 </div>
             </div>
 
-            <div
-                style="margin-top: auto; padding-top: 20px; font-size: 0.7rem; border-top: 1px solid var(--border); color: #444;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span>MQTT BRIDGE CONNECTION</span>
-                    <span id="stat-conn" style="color: #f00;">DISCONNECTED</span>
+            <div class="telemetry-node">
+                <div class="label-group">
+                    <span class="label mono">Secondary Matter</span>
+                    <span class="unit">PM10 μg/m³</span>
                 </div>
-                <div style="margin-top: 5px;">TOPIC: DUSTBOY/+/+/+/status</div>
-                <div id="stat-time" style="margin-top: 5px;">SYNCING...</div>
+                <div class="value" id="val-pm10"
+                    style="color: var(--violet); text-shadow: 0 0 20px rgba(112, 0, 255, 0.3);">--</div>
+                <div class="indicator-bar">
+                    <div class="indicator-fill" id="fill-pm10"
+                        style="background: var(--violet); box-shadow: 0 0 15px var(--violet);"></div>
+                </div>
             </div>
-        </div>
 
-        <!-- Center: Visual Experience -->
-        <div class="center-visual">
-            <div
-                style="color: var(--aurora-1); letter-spacing: 12px; font-weight: 300; font-size: 0.9rem; margin-bottom: 10px;">
-                TELEMETRY FEED</div>
-            <div class="location-box scanning" id="val-loc">SCANNING RANGE...</div>
-            <div style="margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 0.8rem; opacity: 0.5;">TEMPERATURE</div>
-                    <div style="font-size: 2rem; font-weight: 700;" id="val-temp">--°C</div>
+            <div style="margin-top: auto; padding-top: 20px; font-size: 0.7rem; border-top: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                    <span class="mono">Network Status</span>
+                    <span id="stat-conn" style="color: #ff3e3e;" class="mono flicker">Offline</span>
                 </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 0.8rem; opacity: 0.5;">HUMIDITY</div>
-                    <div style="font-size: 2rem; font-weight: 700;" id="val-humid">--%</div>
-                </div>
+                <div class="mono" style="opacity: 0.4;">Secure Bridge: WSS://DUSTBOY-GATEWAY</div>
             </div>
         </div>
 
-        <!-- Right Panel: Remote Nodes -->
+        <!-- Center Visual -->
+        <div class="center-hub">
+            <div class="crosshair"></div>
+            <div class="label mono" style="margin-bottom: 10px;">Geographic Focus</div>
+            <div class="location-tag" id="val-loc">SCANNING...</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px;">
+                <div>
+                    <div class="label mono">Temp</div>
+                    <div style="font-size: 2.5rem; font-weight: 700;" id="val-temp">--°C</div>
+                </div>
+                <div>
+                    <div class="label mono">Humid</div>
+                    <div style="font-size: 2.5rem; font-weight: 700;" id="val-humid">--%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Node Registry -->
         <div class="panel">
-            <div style="margin-bottom: 25px;">
-                <h3 style="font-size: 1.2rem; letter-spacing: 3px;">LIVE NODES</h3>
-                <div style="font-size: 0.6rem; color: #444;">REAL-TIME SIGNAL CAPTURE</div>
+            <div class="mono"
+                style="font-size: 0.8rem; letter-spacing: 4px; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px;">
+                Active Oracle Nodes
             </div>
-
-            <div class="log-list" id="log-list">
-                <!-- Data items inject here -->
-                <div style="text-align: center; margin-top: 100px; color: #333; font-size: 0.8rem;">
-                    WAITING FOR FIRST PACKET...
-                </div>
+            <div class="node-list" id="node-list">
+                <!-- Nodes inject here -->
+                <div style="text-align: center; padding-top: 50px; opacity: 0.3;" class="mono">Syncing Registry...</div>
             </div>
-
-            <div style="margin-top: 20px; textAlign: right;">
-                <button onclick="toggleSniffer()"
-                    style="background: transparent; border: 1px solid var(--border); color: #333; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-size: 0.6rem;">DEBUG
-                    SNIFFER</button>
+            <div style="margin-top: 20px; font-size: 0.6rem; opacity: 0.4;" class="mono">
+                System Time: <span id="sys-time">00:00:00</span>
             </div>
         </div>
     </div>
 
-    <!-- Packet Sniffer (Tool for Nadticha to see raw data) -->
-    <div class="sniffer" id="sniffer">
-        [ SYSTEM ] Establishing WebSocket connection...
-    </div>
+    <div id="stat-msg" class="mono">READY TO ENGAGE</div>
 
     <script>
-        const sniffer = document.getElementById('sniffer');
-        const logList = document.getElementById('log-list');
+        // --- THREE.JS BACKGROUND ---
+        const canvas = document.getElementById('three-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
 
-        function toggleSniffer() {
-            sniffer.style.display = sniffer.style.display === 'block' ? 'none' : 'block';
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        // Particles
+        const partCount = 2000;
+        const geo = new THREE.BufferGeometry();
+        const pos = new Float32Array(partCount * 3);
+        const sizes = new Float32Array(partCount);
+
+        for (let i = 0; i < partCount * 3; i++) {
+            pos[i] = (Math.random() - 0.5) * 20;
         }
+        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
 
-        function addSniff(text) {
-            const div = document.createElement('div');
-            div.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
-            sniffer.prepend(div);
-            if (sniffer.children.length > 50) sniffer.lastChild.remove();
+        const mat = new THREE.PointsMaterial({
+            color: 0x00f2ff,
+            size: 0.05,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending
+        });
+
+        const points = new THREE.Points(geo, mat);
+        scene.add(points);
+
+        // Core Sphere
+        const coreGeo = new THREE.IcosahedronGeometry(1.5, 4);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff, wireframe: true, transparent: true, opacity: 0.1 });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        scene.add(core);
+
+        let intensity = 1;
+        function animate() {
+            requestAnimationFrame(animate);
+            points.rotation.y += 0.001 * intensity;
+            points.rotation.x += 0.0005 * intensity;
+            core.rotation.y -= 0.002 * intensity;
+
+            // Pulse logic
+            const time = Date.now() * 0.001;
+            core.scale.setScalar(1 + Math.sin(time) * 0.05 * intensity);
+
+            renderer.render(scene, camera);
         }
+        animate();
 
-        // --- ULTRA FALLBACK DATA ENGINE ---
-        function extractValue(data, patterns) {
-            // Check literal keys first
-            for (const p of patterns) {
-                if (data[p] !== undefined) return parseFloat(data[p]);
-            }
-            // Smart scanning for keys containing patterns (fuzzy match)
-            for (const key in data) {
-                const kLower = key.toLowerCase();
-                for (const p of patterns) {
-                    if (kLower.includes(p)) return parseFloat(data[key]);
-                }
-            }
-            return 0;
-        }
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
-        function extractName(data, topic) {
-            if (data.nickname) return data.nickname;
-            if (data.db_name) return data.db_name;
-            if (data.station_name) return data.station_name;
-            // Topic fallback: DUSTBOY/ID/NAME/+/status
-            const parts = topic.split('/');
-            return parts[2] || parts[1] || "Unknown Node";
-        }
-
-        // --- MQTT LOGIC ---
+        // --- MQTT & DATA LOGIC ---
         const client = mqtt.connect('wss://dustboy-wss-bridge.laris.workers.dev/mqtt');
 
         client.on('connect', () => {
-            document.getElementById('stat-conn').innerText = 'CONNECTED';
-            document.getElementById('stat-conn').style.color = '#00f2ff';
-            addSniff("Connected to bridge. Subscribing...");
+            const statusEl = document.getElementById('stat-conn');
+            statusEl.innerText = 'ONLINE';
+            statusEl.style.color = 'var(--cyan)';
+            statusEl.classList.remove('flicker');
             client.subscribe('DUSTBOY/+/+/+/status');
+            systemMsg("LINK ESTABLISHED");
         });
 
         client.on('message', (topic, message) => {
             try {
-                const raw = message.toString();
-                addSniff(`RAW DATA: ${raw}`);
-                const data = JSON.parse(raw);
-                updateUI(data, topic);
+                const data = JSON.parse(message.toString());
+                updateHUD(data, topic);
             } catch (e) {
-                addSniff(`PARSE ERROR: ${e.message}`);
+                systemMsg("DATA PARSE ERROR");
             }
         });
 
-        function updateUI(data, topic) {
-            // Extract using Ultra-Fallback
-            const pm25 = extractValue(data, ['pm25', '25', 'v25', 'p2']);
-            const pm10 = extractValue(data, ['pm10', '10', 'v10', 'p1']);
-            const temp = extractValue(data, ['temp', 'tp', 't']);
-            const humid = extractValue(data, ['humid', 'hm', 'h']);
-            const loc = extractName(data, topic);
+        function updateHUD(data, topic) {
+            // Extraction
+            const pm25 = data.pm25 || data.v25 || 0;
+            const pm10 = data.pm10 || data.v10 || 0;
+            const temp = data.temp || data.tp || 0;
+            const humid = data.humid || data.hm || 0;
+            const loc = data.nickname || data.db_name || topic.split('/')[2] || "NODE-UNKNOWN";
 
-            // Update Elements
+            // Update UI
             document.getElementById('val-pm25').innerText = Math.round(pm25);
             document.getElementById('val-pm10').innerText = Math.round(pm10);
             document.getElementById('val-temp').innerText = `${Math.round(temp)}°C`;
             document.getElementById('val-humid').innerText = `${Math.round(humid)}%`;
+            document.getElementById('val-loc').innerText = loc;
 
-            const locEl = document.getElementById('val-loc');
-            locEl.innerText = loc;
-            locEl.classList.remove('scanning');
-
-            document.getElementById('stat-time').innerText = `LATEST SYNC: ${new Date().toLocaleTimeString()}`;
-
-            // Progress fills
+            // Fills
             document.getElementById('fill-pm25').style.width = Math.min(pm25, 100) + '%';
             document.getElementById('fill-pm10').style.width = Math.min(pm10, 100) + '%';
 
-            // Log Item
-            const item = document.createElement('div');
-            item.className = 'log-item';
+            // Intensity Shift (Visual Reaction)
+            intensity = 1 + (pm25 / 50); // Speed up when dust is high
+            mat.color.setHSL(0.5 - (pm25 / 200), 1, 0.5); // Color shift to red if high
+
+            // Register Node
+            registryNode(loc, pm25);
+            systemMsg(`PACKET RECEIVED: ${loc}`);
+        }
+
+        function registryNode(name, pm25) {
+            const list = document.getElementById('node-list');
+
+            // Remove blank msg
+            if (list.innerText.includes("Syncing")) list.innerHTML = "";
+
+            // Check if node already exists
+            let item = document.getElementById(`node-${name.replace(/\s+/g, '-')}`);
+            if (!item) {
+                item = document.createElement('div');
+                item.className = 'node-item';
+                item.id = `node-${name.replace(/\s+/g, '-')}`;
+                list.insertBefore(item, list.firstChild);
+            }
+
             item.innerHTML = `
-                <div class="log-header">
-                    <span style="color:#fff;">${loc}</span>
-                    <span style="opacity:0.4;">${new Date().toLocaleTimeString()}</span>
+                <div class="node-info">
+                    <div class="name">${name}</div>
+                    <div class="time mono">${new Date().toLocaleTimeString()}</div>
                 </div>
-                <div class="log-body">
-                    <div class="log-val">${Math.round(pm25)} <span style="font-size:0.5rem; opacity:0.5;">PM2.5</span></div>
-                    <div class="log-val" style="color:var(--aurora-2);">${Math.round(pm10)} <span style="font-size:0.5rem; opacity:0.5;">PM10</span></div>
+                <div class="node-stats">
+                    <div class="val mono">${Math.round(pm25)}</div>
+                    <div class="label mono" style="font-size:0.5rem;">AQI READY</div>
                 </div>
             `;
-            logList.insertBefore(item, logList.firstChild);
-            if (logList.children.length > 5) logList.lastChild.remove();
+
+            // Keep only top 5
+            if (list.children.length > 5) list.lastChild.remove();
         }
+
+        function systemMsg(msg) {
+            document.getElementById('stat-msg').innerText = `SYSTEM // ${msg}`;
+        }
+
+        // Clock
+        setInterval(() => {
+            document.getElementById('sys-time').innerText = new Date().toLocaleTimeString();
+        }, 1000);
     </script>
 </body>
 
