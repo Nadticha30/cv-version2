@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle Stack — PSRU Workshop Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        :root {
+            --bg: #020617;
+            --primary: #00f2ff;
+            --accent: #7000ff;
+            --text: #f8fafc;
+            --muted: #64748b;
+            --panel: rgba(15, 23, 42, 0.85);
+            --border: rgba(0, 242, 255, 0.2);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            overflow: hidden;
+            background-image:
+                radial-gradient(circle at 20% 30%, rgba(112, 0, 255, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(0, 242, 255, 0.05) 0%, transparent 40%),
+                linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        .scanning-line {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to bottom, transparent, var(--primary), transparent);
+            opacity: 0.08;
+            z-index: 100;
+            pointer-events: none;
+            animation: scan 10s linear infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                top: -5%;
+            }
+
+            100% {
+                top: 105%;
+            }
+        }
+
+        #app {
+            display: flex;
+            height: 100vh;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            padding: 16px;
+        }
+
+        /* Game Panel */
+        #game-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        #game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 360px;
+        }
+
+        .game-title {
+            font-size: 1.4rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .score-display {
+            text-align: right;
+        }
+
+        .score-label {
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .score-value {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--primary);
+            line-height: 1;
+            text-shadow: 0 0 20px rgba(0, 242, 255, 0.5);
+        }
+
+        #canvas-wrapper {
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 0 40px rgba(0, 242, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        #canvas-wrapper::before,
+        #canvas-wrapper::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--primary);
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        #canvas-wrapper::before {
+            top: 0;
+            left: 0;
+            border-right: none;
+            border-bottom: none;
+            border-radius: 20px 0 0 0;
+        }
+
+        #canvas-wrapper::after {
+            bottom: 0;
+            right: 0;
+            border-left: none;
+            border-top: none;
+            border-radius: 0 0 20px 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #hint {
+            font-size: 0.8rem;
+            color: var(--muted);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-align: center;
+            animation: pulse-text 2s infinite;
+        }
+
+        @keyframes pulse-text {
+
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* Leaderboard Panel */
+        #leaderboard-panel {
+            background: var(--panel);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 24px;
+            width: 260px;
+            min-height: 400px;
+            position: relative;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        #leaderboard-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 20px;
+            height: 20px;
+            border-top: 2px solid var(--primary);
+            border-left: 2px solid var(--primary);
+            border-radius: 24px 0 0 0;
+        }
+
+        .lb-title {
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .lb-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .lb-rank {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--muted);
+            width: 20px;
+            text-align: center;
+        }
+
+        .lb-rank.gold {
+            color: #ffd700;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        .lb-rank.silver {
+            color: #c0c0c0;
+        }
+
+        .lb-rank.bronze {
+            color: #cd7f32;
+        }
+
+        .lb-info {
+            flex: 1;
+        }
+
+        .lb-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .lb-score {
+            font-size: 0.7rem;
+            color: var(--primary);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .lb-bar {
+            height: 3px;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            border-radius: 2px;
+            margin-top: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .lb-empty {
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 20px;
+            letter-spacing: 1px;
+        }
+
+        .mqtt-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .mqtt-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--muted);
+            transition: all 0.3s;
+        }
+
+        .mqtt-dot.connected {
+            background: var(--primary);
+            box-shadow: 0 0 8px var(--primary);
+            animation: blink 2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* Overlays */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.92);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            border-radius: 20px;
+            z-index: 10;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .overlay h2 {
+            font-size: 1.6rem;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .overlay .big-score {
+            font-size: 4rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-shadow: 0 0 30px rgba(0, 242, 255, 0.6);
+        }
+
+        .oracle-name-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 20px;
+            color: var(--text);
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-align: center;
+            width: 280px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .oracle-name-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+        }
+
+        .oracle-name-input::placeholder {
+            color: var(--muted);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #0080ff);
+            color: var(--bg);
+            border: none;
+            border-radius: 100px;
+            padding: 12px 32px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 10px 28px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .difficulty-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
+
+        .difficulty-meter {
+            display: flex;
+            gap: 3px;
+        }
+
+        .diff-pip {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            transition: background 0.3s;
+        }
+
+        .diff-pip.active {
+            background: var(--primary);
+            box-shadow: 0 0 6px var(--primary);
+        }
+
+        .diff-pip.active.medium {
+            background: #ffd700;
+            box-shadow: 0 0 6px #ffd700;
+        }
+
+        .diff-pip.active.hard {
+            background: #f43f5e;
+            box-shadow: 0 0 6px #f43f5e;
+        }
+
+        @media (max-width: 680px) {
+            #app {
+                flex-direction: column;
+            }
+
+            #leaderboard-panel {
+                width: 360px;
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="scanning-line"></div>
+
+    <div id="app">
+        <div id="game-panel">
+            <div id="game-header">
+                <div class="game-title">Oracle Stack</div>
+                <div class="score-display">
+                    <div class="score-label">Score</div>
+                    <div class="score-value" id="score-display">0</div>
+                </div>
+            </div>
+
+            <div id="canvas-wrapper">
+                <canvas id="gameCanvas" width="360" height="540"></canvas>
+
+                <!-- Start Overlay -->
+                <div class="overlay" id="overlay-start">
+                    <h2>Oracle Stack</h2>
+                    <p
+                        style="color:var(--muted);font-size:0.9rem;letter-spacing:2px;text-align:center;line-height:1.8;">
+                        Stack the boxes as high<br>as you can without falling
+                    </p>
+                    <button class="btn-primary" id="btn-start">▶ START</button>
+                    <div style="font-size:0.7rem;color:var(--muted);letter-spacing:2px;">SPACEBAR / TAP TO DROP</div>
+                </div>
+
+                <!-- Game Over Overlay -->
+                <div class="overlay hidden" id="overlay-gameover">
+                    <h2>Game Over</h2>
+                    <div class="big-score" id="final-score">0</div>
+                    <p style="color:var(--muted);font-size:0.75rem;letter-spacing:2px;">BOXES STACKED</p>
+                    <input type="text" class="oracle-name-input" id="player-name" placeholder="YOUR ORACLE NAME"
+                        maxlength="24">
+                    <button class="btn-primary" id="btn-submit">📡 SUBMIT TO LEADERBOARD</button>
+                    <button class="btn-secondary" id="btn-restart">PLAY AGAIN</button>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;width:360px;align-items:center;">
+                <div id="hint">SPACEBAR / TAP TO DROP</div>
+                <div class="difficulty-bar">
+                    LVL
+                    <div class="difficulty-meter" id="difficulty-meter">
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                        <div class="diff-pip"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard-panel">
+            <div class="lb-title">🏆 Oracle Leaderboard</div>
+            <div id="leaderboard-list">
+                <div class="lb-empty">Connecting...</div>
+            </div>
+            <div class="mqtt-status">
+                <div class="mqtt-dot" id="mqtt-dot"></div>
+                <span id="mqtt-status-text">Connecting to MQTT...</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        //  ORACLE STACK GAME — Core Engine
+        // =============================================
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width;
+        const H = canvas.height;
+
+        // Game state
+        let score = 0;
+        let gameRunning = false;
+        let animFrame = null;
+        let difficultyLevel = 1;
+
+        // Box settings
+        const BOX_HEIGHT = 30;
+        const INITIAL_WIDTH = 240;
+        const MIN_WIDTH = 30;
+        const FLOOR_Y = H - 30;
+        const COLORS = [
+            ['#00f2ff', '#0080ff'], ['#7000ff', '#ff00aa'], ['#10b981', '#00f2ff'],
+            ['#ffd700', '#ff9d00'], ['#f43f5e', '#ff7700'], ['#a855f7', '#3b82f6'],
+            ['#06b6d4', '#8b5cf6'], ['#ec4899', '#f43f5e'], ['#22d3ee', '#6366f1'],
+        ];
+
+        // Stack storage
+        let stack = []; // { x, y, width, color }
+        let movingBox = { x: 0, y: 0, width: 0, color: null, dir: 1 };
+        let swayOffset = 0;
+        let swayTime = 0;
+
+        function getSwaySpeed() {
+            // Difficulty: base 0.02 speed, increases every 5 stacks
+            return 0.02 + (difficultyLevel - 1) * 0.004;
+        }
+        function getSwayAmplitude() {
+            // Reduces as game progresses (less room)
+            return Math.max(60, 140 - (difficultyLevel - 1) * 10);
+        }
+
+        function initGame() {
+            score = 0;
+            difficultyLevel = 1;
+            swayTime = 0;
+            stack = [];
+
+            // Create base
+            const baseX = (W - INITIAL_WIDTH) / 2;
+            stack.push({
+                x: baseX, y: FLOOR_Y - BOX_HEIGHT,
+                width: INITIAL_WIDTH,
+                color: COLORS[0]
+            });
+
+            spawnNextBox();
+            updateScoreDisplay();
+            updateDifficultyMeter();
+        }
+
+        function spawnNextBox() {
+            const top = stack[stack.length - 1];
+            const colorIdx = stack.length % COLORS.length;
+            const newWidth = Math.max(MIN_WIDTH, top.width);
+            const newY = top.y - BOX_HEIGHT;
+
+            movingBox = {
+                x: -newWidth, // start from left
+                y: newY,
+                width: newWidth,
+                color: COLORS[colorIdx],
+                dir: 1
+            };
+            swayTime = 0;
+        }
+
+        function dropBox() {
+            if (!gameRunning) return;
+            const top = stack[stack.length - 1];
+
+            // Calculate overlap
+            const overlapLeft = Math.max(movingBox.x, top.x);
+            const overlapRight = Math.min(movingBox.x + movingBox.width, top.x + top.width);
+            const overlapWidth = overlapRight - overlapLeft;
+
+            if (overlapWidth <= 0) {
+                // Missed — Game Over
+                endGame();
+                return;
+            }
+
+            // Trim and place
+            const placed = {
+                x: overlapLeft,
+                y: movingBox.y,
+                width: overlapWidth,
+                color: movingBox.color
+            };
+            stack.push(placed);
+
+            score++;
+            updateScoreDisplay();
+
+            // Scroll view if stack is getting high
+            if (stack.length > 10) {
+                for (let b of stack) b.y += BOX_HEIGHT;
+                // Keep base off-screen
+            }
+
+            // Update difficulty every 5 boxes
+            difficultyLevel = Math.floor(score / 5) + 1;
+            updateDifficultyMeter();
+
+            spawnNextBox();
+        }
+
+        function updateScoreDisplay() {
+            document.getElementById('score-display').textContent = score;
+        }
+
+        function updateDifficultyMeter() {
+            const pips = document.querySelectorAll('.diff-pip');
+            const level = Math.min(difficultyLevel, 8);
+            pips.forEach((pip, i) => {
+                pip.classList.remove('active', 'medium', 'hard');
+                if (i < level) {
+                    pip.classList.add('active');
+                    if (i >= 5) pip.classList.add('hard');
+                    else if (i >= 3) pip.classList.add('medium');
+                }
+            });
+        }
+
+        function drawBackground() {
+            ctx.clearRect(0, 0, W, H);
+            // Deep space bg
+            ctx.fillStyle = '#030712';
+            ctx.fillRect(0, 0, W, H);
+
+            // Grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.02)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < W; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+            for (let y = 0; y < H; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+            // Floor
+            const floorGrad = ctx.createLinearGradient(0, FLOOR_Y, 0, H);
+            floorGrad.addColorStop(0, 'rgba(0,242,255,0.3)');
+            floorGrad.addColorStop(1, 'rgba(0,242,255,0)');
+            ctx.fillStyle = floorGrad;
+            ctx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+
+            ctx.strokeStyle = 'rgba(0,242,255,0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, FLOOR_Y);
+            ctx.lineTo(W, FLOOR_Y);
+            ctx.stroke();
+        }
+
+        function drawBox(box, isMoving = false) {
+            const radius = 6;
+            const grad = ctx.createLinearGradient(box.x, box.y, box.x + box.width, box.y + BOX_HEIGHT);
+            grad.addColorStop(0, box.color[0] + (isMoving ? 'cc' : 'ff'));
+            grad.addColorStop(1, box.color[1] + (isMoving ? 'cc' : 'ff'));
+
+            ctx.beginPath();
+            ctx.roundRect(box.x, box.y, box.width, BOX_HEIGHT, radius);
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Top highlight
+            ctx.beginPath();
+            ctx.roundRect(box.x + 4, box.y + 3, box.width - 8, 6, 3);
+            ctx.fillStyle = 'rgba(255,255,255,0.25)';
+            ctx.fill();
+
+            // Glow border
+            ctx.beginPath();
+            ctx.roundRect(box.x, box.y, box.width, BOX_HEIGHT, radius);
+            ctx.strokeStyle = box.color[0] + '66';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Glow effect on moving box
+            if (isMoving) {
+                ctx.shadowColor = box.color[0];
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.roundRect(box.x, box.y, box.width, BOX_HEIGHT, radius);
+                ctx.strokeStyle = box.color[0] + 'aa';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function drawDangerLine(top) {
+            // Show alignment guide
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.setLineDash([4, 8]);
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(top.x, 0);
+            ctx.lineTo(top.x, H);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(top.x + top.width, 0);
+            ctx.lineTo(top.x + top.width, H);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Update moving box position
+            swayTime += getSwaySpeed();
+            const amplitude = getSwayAmplitude();
+            const centerX = (W - movingBox.width) / 2;
+            movingBox.x = centerX + Math.sin(swayTime) * amplitude;
+
+            // Draw
+            drawBackground();
+
+            const top = stack[stack.length - 1];
+            drawDangerLine(top);
+
+            // Draw stacked boxes
+            for (let b of stack) drawBox(b);
+
+            // Draw moving box
+            drawBox(movingBox, true);
+
+            animFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            document.getElementById('overlay-start').classList.add('hidden');
+            gameRunning = true;
+            initGame();
+            gameLoop();
+        }
+
+        function endGame() {
+            gameRunning = false;
+            cancelAnimationFrame(animFrame);
+
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('overlay-gameover').classList.remove('hidden');
+
+            // Pre-fill if name was used before
+            const saved = localStorage.getItem('oracleStackName');
+            if (saved) document.getElementById('player-name').value = saved;
+        }
+
+        function restartGame() {
+            document.getElementById('overlay-gameover').classList.add('hidden');
+            gameRunning = true;
+            initGame();
+            gameLoop();
+        }
+
+        // Input handling
+        document.getElementById('btn-start').addEventListener('click', startGame);
+        document.getElementById('btn-restart').addEventListener('click', restartGame);
+        document.getElementById('btn-submit').addEventListener('click', submitScore);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') { e.preventDefault(); dropBox(); }
+        });
+        canvas.addEventListener('click', dropBox);
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); dropBox(); });
+
+        // =============================================
+        //  MQTT Leaderboard
+        // =============================================
+
+        const MQTT_BROKER = 'wss://dustboy-wss-bridge.laris.workers.dev/mqtt';
+        const TOPIC_PREFIX = 'oracle/stack-game/scores/';
+        const TOPIC_SUB = 'oracle/stack-game/scores/#';
+
+        let mqttClient = null;
+        let leaderboard = {}; // name -> {score, date}
+
+        function connectMQTT() {
+            const clientId = 'oracle-stack-' + Math.random().toString(36).slice(2, 8);
+            mqttClient = mqtt.connect(MQTT_BROKER, {
+                clientId,
+                clean: true,
+                reconnectPeriod: 3000,
+                connectTimeout: 8000
+            });
+
+            mqttClient.on('connect', () => {
+                setMqttStatus(true, 'MQTT LIVE');
+                mqttClient.subscribe(TOPIC_SUB, { qos: 1 });
+            });
+
+            mqttClient.on('message', (topic, payload) => {
+                try {
+                    const data = JSON.parse(payload.toString());
+                    if (data.name && typeof data.score === 'number') {
+                        // Keep only best score per player
+                        const key = data.name;
+                        if (!leaderboard[key] || data.score > leaderboard[key].score) {
+                            leaderboard[key] = { score: data.score, date: data.date || '' };
+                            renderLeaderboard();
+                        }
+                    }
+                } catch (e) { }
+            });
+
+            mqttClient.on('error', () => setMqttStatus(false, 'ERROR'));
+            mqttClient.on('offline', () => setMqttStatus(false, 'OFFLINE'));
+            mqttClient.on('reconnect', () => setMqttStatus(false, 'RECONNECTING...'));
+        }
+
+        function setMqttStatus(connected, text) {
+            const dot = document.getElementById('mqtt-dot');
+            const label = document.getElementById('mqtt-status-text');
+            dot.className = 'mqtt-dot' + (connected ? ' connected' : '');
+            label.textContent = text;
+        }
+
+        function submitScore() {
+            const name = document.getElementById('player-name').value.trim();
+            if (!name) { document.getElementById('player-name').focus(); return; }
+            if (score === 0) { restartGame(); return; }
+
+            localStorage.setItem('oracleStackName', name);
+
+            const payload = JSON.stringify({ name, score, date: new Date().toISOString().slice(0, 10) });
+            const topic = TOPIC_PREFIX + name.replace(/\s+/g, '_');
+
+            // Only update if new high score
+            const existing = leaderboard[name];
+            if (!existing || score > existing.score) {
+                if (mqttClient && mqttClient.connected) {
+                    mqttClient.publish(topic, payload, { retain: true, qos: 1 }, (err) => {
+                        if (!err) {
+                            leaderboard[name] = { score, date: new Date().toISOString().slice(0, 10) };
+                            renderLeaderboard();
+                        }
+                    });
+                } else {
+                    // Offline fallback: save locally
+                    leaderboard[name] = { score, date: '' };
+                    renderLeaderboard();
+                }
+            }
+
+            restartGame();
+        }
+
+        function renderLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            const entries = Object.entries(leaderboard)
+                .map(([name, data]) => ({ name, ...data }))
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10);
+
+            if (entries.length === 0) {
+                list.innerHTML = '<div class="lb-empty">No scores yet!<br>Be the first!</div>';
+                return;
+            }
+
+            const maxScore = entries[0].score || 1;
+            const rankClass = (i) => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+            const rankIcon = (i) => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
+
+            list.innerHTML = entries.map((e, i) => `
+            <div class="lb-entry">
+                <div class="lb-rank ${rankClass(i)}">${rankIcon(i)}</div>
+                <div class="lb-info">
+                    <div class="lb-name">${e.name}</div>
+                    <div class="lb-bar" style="width:${Math.round((e.score / maxScore) * 100)}%"></div>
+                </div>
+                <div class="lb-score">${e.score}</div>
+            </div>
+        `).join('');
+        }
+
+        // Initialize
+        connectMQTT();
+        renderLeaderboard();
+    </script>
+</body>
+
+</html>
